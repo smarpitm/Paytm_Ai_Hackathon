@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  /* LED Ring Animations for Paytm Soundbox Simulator */
+  .led-idle {
+    box-shadow: 0 0 25px 4px rgba(0, 186, 242, 0.45);
+    border-color: #00BAF2;
+  }
+
+  .led-listening {
+    box-shadow: 0 0 35px 8px rgba(16, 185, 129, 0.7);
+    border-color: #10B981;
+    animation: pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .led-processing {
+    box-shadow: 0 0 35px 8px rgba(245, 158, 11, 0.7);
+    border-color: #F59E0B;
+    animation: spin 2s linear infinite;
+  }
+
+  .led-speaking {
+    box-shadow: 0 0 40px 10px rgba(0, 186, 242, 0.8), 0 0 70px 18px rgba(255, 255, 255, 0.3);
+    border-color: #FFFFFF;
+    animation: pulse 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .led-success {
+    box-shadow: 0 0 45px 12px rgba(16, 185, 129, 0.9);
+    border-color: #34D399;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+

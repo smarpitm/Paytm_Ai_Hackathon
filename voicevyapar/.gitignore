@@ -1,0 +1,18 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+voicevyapar.db
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Environment variables
+backend/.env
+.env
+
