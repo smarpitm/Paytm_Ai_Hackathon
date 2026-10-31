@@ -103,7 +103,7 @@
 - KUSH_K2 (backend/services/sarvam_service.py, backend/services/llm_service.py): DONE
 - KUSH_K3 (backend/services/session_manager.py): DONE
 - KUSH_K4 (backend/main.py): DONE
-- KUSH_K5 (frontend/src/components/SoundboxDevice.jsx, TelemetryLog.jsx, pages/SoundboxPage.jsx): PENDING
+- KUSH_K5 (frontend/src/components/SoundboxDevice.jsx, TelemetryLog.jsx, pages/SoundboxPage.jsx): DONE
 - SMARPIT_S1 (backend/services/qr_service.py, backend/services/credit_engine.py): DONE
 - SMARPIT_S2 (backend/services/telegram_service.py): DONE
 - SMARPIT_S3 (frontend/src/lib/api.js, socket.js, components/Navbar.jsx): DONE
