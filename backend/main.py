@@ -10,7 +10,7 @@ backend_dir = Path(__file__).resolve().parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
-from fastapi import FastAPI, UploadFile, File, Form, Depends, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, Depends, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -30,7 +30,10 @@ from services.telegram_service import (
     send_telegram_qr_reminder,
     send_telegram_discount_broadcast,
     get_active_demo_chat_id,
-    set_active_demo_chat_id
+    set_active_demo_chat_id,
+    process_telegram_webhook_update,
+    set_telegram_webhook,
+    get_detailed_bot_status
 )
 from config import SARVAM_KEY_POOL, GROQ_KEY_POOL
 
@@ -591,22 +594,30 @@ async def demo_reset(db: Session = Depends(get_db)):
 
 
 # -------------------------------------------------------------------
-# 9. Telegram Bot Diagnostics & Link Helper
+# 9. Telegram Bot Webhook, Diagnostics & Link Helper
 # -------------------------------------------------------------------
+@app.post("/api/v1/telegram/webhook")
+async def telegram_webhook(request: Request):
+    """Direct HTTPS webhook receiver from Telegram servers."""
+    try:
+        data = await request.json()
+        await process_telegram_webhook_update(data)
+        return {"ok": True}
+    except Exception as e:
+        print(f"[Telegram Webhook Error] {e}")
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/v1/telegram/set-webhook")
+async def set_webhook_endpoint(payload: dict = {}):
+    url = payload.get("url") or "https://voicevyapar-backend.onrender.com/api/v1/telegram/webhook"
+    res = await set_telegram_webhook(url)
+    return res
+
+
 @app.get("/api/v1/telegram/status")
-def telegram_bot_status(db: Session = Depends(get_db)):
-    linked_customers = db.query(Customer).filter(Customer.telegram_chat_id.isnot(None)).all()
-    active_chat = get_active_demo_chat_id()
-    return {
-        "bot_active": is_telegram_bot_active(),
-        "bot_username": "Paytm_01bot",
-        "bot_link": "https://t.me/Paytm_01bot",
-        "active_demo_chat_id": active_chat,
-        "linked_customers": [
-            {"id": c.id, "name": c.name, "phone": c.phone, "chat_id": c.telegram_chat_id}
-            for c in linked_customers
-        ]
-    }
+async def telegram_bot_status(db: Session = Depends(get_db)):
+    return await get_detailed_bot_status(db)
 
 
 @app.post("/api/v1/telegram/link-chat")
@@ -638,12 +649,17 @@ def link_telegram_chat(payload: dict, db: Session = Depends(get_db)):
 
 @app.post("/api/v1/telegram/send-test")
 async def send_test_telegram(payload: dict = {}, db: Session = Depends(get_db)):
+    chat_id = payload.get("chat_id")
+    if chat_id:
+        set_active_demo_chat_id(chat_id)
+
     cust = db.query(Customer).first()
     res = await send_telegram_qr_reminder(
         db,
         customer_id=cust.id if cust else 1,
-        amount=150.0,
-        item_name="Paytm Kirana Test Udhaar",
-        tx_id=1
+        amount=payload.get("amount", 150.0),
+        item_name=payload.get("item_name", "Paytm Kirana Test Udhaar"),
+        tx_id=1,
+        override_chat_id=chat_id
     )
     return res

@@ -17,6 +17,8 @@ _bot_app: Optional[Application] = None
 _ws_broadcast_cb: Optional[Callable[[dict], Any]] = None
 _demo_env = os.getenv("DEFAULT_DEMO_CHAT_ID", "").strip()
 _active_demo_chat_id: str = "" if _demo_env.startswith("your_") else _demo_env
+_last_bot_error: Optional[str] = None
+_bot_mode: str = "OFFLINE"
 
 
 def is_telegram_bot_active() -> bool:
@@ -72,6 +74,17 @@ async def handle_link_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if update.message:
         await update.message.reply_text(reply, parse_mode="Markdown")
+
+    if _ws_broadcast_cb:
+        try:
+            await _ws_broadcast_cb({
+                "event_type": "TELEGRAM_LINKED",
+                "chat_id": chat_id,
+                "first_name": first_name,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        except Exception:
+            pass
 
 
 async def handle_any_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -157,8 +170,13 @@ async def send_telegram_qr_reminder(
     customer_id: int,
     amount: Optional[float] = None,
     item_name: str = "Kirana Udhaar",
-    tx_id: int = 0
+    tx_id: int = 0,
+    override_chat_id: Optional[str] = None
 ) -> dict:
+    global _bot_app
+    if not _bot_app:
+        await start_telegram_bot(_ws_broadcast_cb)
+
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
     c_name = customer.name if customer else "Customer"
     c_bal = customer.total_udhaar_balance if customer else 0.0
@@ -174,8 +192,7 @@ async def send_telegram_qr_reminder(
         f"Scan the Paytm QR above or tap the button below to pay instantly:"
     )
 
-    # Resolution order: customer chat -> active demo chat -> any linked customer chat
-    dest_chat = (customer.telegram_chat_id if customer else None) or _active_demo_chat_id
+    dest_chat = override_chat_id or (customer.telegram_chat_id if customer else None) or _active_demo_chat_id
     if not dest_chat:
         linked_any = db.query(Customer).filter(Customer.telegram_chat_id.isnot(None)).first()
         if linked_any:
@@ -215,6 +232,10 @@ async def send_telegram_discount_broadcast(
     custom_message: str = "",
     **kwargs
 ) -> int:
+    global _bot_app
+    if not _bot_app:
+        await start_telegram_bot(_ws_broadcast_cb)
+
     offer = discount_offer or discount_text or "Special Offer"
     msg = message_text or custom_message or f"Namaste! Aaj {item_name} par {offer} chhoot hai! Jaldi aayein."
 
@@ -225,7 +246,6 @@ async def send_telegram_discount_broadcast(
     if _active_demo_chat_id:
         dest_chats.add(_active_demo_chat_id)
 
-    # If no specific regulars linked, check if ANY customer was linked
     if not dest_chats:
         linked_any = db.query(Customer).filter(Customer.telegram_chat_id.isnot(None)).first()
         if linked_any and linked_any.telegram_chat_id:
@@ -242,34 +262,105 @@ async def send_telegram_discount_broadcast(
     return count
 
 
+async def set_telegram_webhook(url: str) -> dict:
+    """Sets a Telegram webhook directly to the public URL."""
+    global _bot_app, _bot_mode, _last_bot_error
+    if not is_telegram_bot_active():
+        return {"ok": False, "error": "TELEGRAM_BOT_TOKEN not configured"}
+
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    try:
+        if _bot_app is None:
+            _bot_app = Application.builder().token(token).build()
+            _bot_app.add_handler(CommandHandler(["start", "link", "help", "connect", "hi"], handle_link_command))
+            _bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_any_text_message))
+            _bot_app.add_handler(MessageHandler(filters.VOICE, handle_voice_note))
+            _bot_app.add_handler(CallbackQueryHandler(handle_settle_callback, pattern="^settle_tx:"))
+            await _bot_app.initialize()
+            await _bot_app.start()
+
+        if _bot_app.updater and _bot_app.updater.running:
+            await _bot_app.updater.stop()
+
+        res = await _bot_app.bot.set_webhook(url=url, drop_pending_updates=False)
+        _bot_mode = f"WEBHOOK:{url}"
+        _last_bot_error = None
+        return {"ok": True, "result": res, "webhook_url": url, "mode": _bot_mode}
+    except Exception as e:
+        _last_bot_error = str(e)
+        _bot_mode = f"ERROR:{e}"
+        return {"ok": False, "error": str(e)}
+
+
+async def process_telegram_webhook_update(data: dict) -> None:
+    """Receives webhook payload from FastAPI route and routes it to python-telegram-bot handlers."""
+    global _bot_app
+    if _bot_app is None:
+        await start_telegram_bot(_ws_broadcast_cb)
+    if _bot_app and _bot_app.bot:
+        update = Update.de_json(data, _bot_app.bot)
+        if update:
+            await _bot_app.process_update(update)
+
+
 async def start_telegram_bot(ws_broadcast_callback: Optional[Callable[[dict], Any]] = None) -> None:
-    global _bot_app, _ws_broadcast_cb
+    global _bot_app, _ws_broadcast_cb, _last_bot_error, _bot_mode
     _ws_broadcast_cb = ws_broadcast_callback
     if not is_telegram_bot_active():
+        _bot_mode = "INACTIVE"
         return
 
     try:
         token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-        _bot_app = Application.builder().token(token).build()
-        # Handle /start, /link, /help, /connect commands
-        _bot_app.add_handler(CommandHandler(["start", "link", "help", "connect"], handle_link_command))
-        # Handle any freeform incoming text messages (auto-links user phone)
-        _bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_any_text_message))
-        # Handle vernacular voice notes
-        _bot_app.add_handler(MessageHandler(filters.VOICE, handle_voice_note))
-        # Handle 1-click inline UPI payment settlement button
-        _bot_app.add_handler(CallbackQueryHandler(handle_settle_callback, pattern="^settle_tx:"))
-        
-        await _bot_app.initialize()
-        await _bot_app.start()
-        await _bot_app.updater.start_polling()
-        print("[Telegram Bot] Successfully started and polling for messages as @Paytm_01bot")
+        if _bot_app is None:
+            _bot_app = Application.builder().token(token).build()
+            _bot_app.add_handler(CommandHandler(["start", "link", "help", "connect", "hi"], handle_link_command))
+            _bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_any_text_message))
+            _bot_app.add_handler(MessageHandler(filters.VOICE, handle_voice_note))
+            _bot_app.add_handler(CallbackQueryHandler(handle_settle_callback, pattern="^settle_tx:"))
+            await _bot_app.initialize()
+            await _bot_app.start()
+
+        # In production (Render or public URL), auto-register webhook for 100% reliability
+        render_ext = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("TELEGRAM_WEBHOOK_URL")
+        # If on Render (RENDER env var is 'true' or hostname matches)
+        is_render_env = bool(os.getenv("RENDER") or render_ext or not os.name == 'nt')
+
+        if is_render_env:
+            base_url = (render_ext or "https://voicevyapar-backend.onrender.com").rstrip('/')
+            webhook_url = f"{base_url}/api/v1/telegram/webhook"
+            try:
+                if _bot_app.updater and _bot_app.updater.running:
+                    await _bot_app.updater.stop()
+                await _bot_app.bot.set_webhook(url=webhook_url, drop_pending_updates=False)
+                _bot_mode = f"WEBHOOK:{webhook_url}"
+                print(f"[Telegram Bot] Webhook successfully registered: {webhook_url}")
+            except Exception as e:
+                print(f"[Telegram Bot Webhook Setup Error] {e}")
+                # Fallback to polling
+                if not (_bot_app.updater and _bot_app.updater.running):
+                    await _bot_app.updater.start_polling(drop_pending_updates=False)
+                _bot_mode = "POLLING"
+        else:
+            # Local dev: start polling
+            try:
+                await _bot_app.bot.delete_webhook(drop_pending_updates=False)
+            except Exception:
+                pass
+            if not (_bot_app.updater and _bot_app.updater.running):
+                await _bot_app.updater.start_polling(drop_pending_updates=False)
+            _bot_mode = "POLLING"
+            print("[Telegram Bot] Successfully started and polling for messages as @Paytm_01bot")
+
+        _last_bot_error = None
     except Exception as e:
+        _last_bot_error = str(e)
+        _bot_mode = f"ERROR:{e}"
         print(f"[Telegram Bot Start Error] {e}")
 
 
 async def stop_telegram_bot() -> None:
-    global _bot_app
+    global _bot_app, _bot_mode
     if _bot_app:
         try:
             if _bot_app.updater and _bot_app.updater.running:
@@ -281,3 +372,39 @@ async def stop_telegram_bot() -> None:
             pass
         finally:
             _bot_app = None
+            _bot_mode = "STOPPED"
+
+
+async def get_detailed_bot_status(db: Session) -> dict:
+    global _bot_app, _bot_mode, _last_bot_error
+    linked_customers = db.query(Customer).filter(Customer.telegram_chat_id.isnot(None)).all()
+    active_chat = get_active_demo_chat_id()
+
+    webhook_info = {}
+    if _bot_app and _bot_app.bot:
+        try:
+            wh = await _bot_app.bot.get_webhook_info()
+            webhook_info = {
+                "url": wh.url,
+                "has_custom_certificate": wh.has_custom_certificate,
+                "pending_update_count": wh.pending_update_count,
+                "last_error_message": wh.last_error_message
+            }
+        except Exception as e:
+            webhook_info = {"error": str(e)}
+
+    return {
+        "bot_active": is_telegram_bot_active(),
+        "bot_username": "Paytm_01bot",
+        "bot_link": "https://t.me/Paytm_01bot",
+        "bot_mode": _bot_mode,
+        "bot_app_running": _bot_app is not None and getattr(_bot_app, "running", False),
+        "updater_running": _bot_app.updater.running if (_bot_app and _bot_app.updater) else False,
+        "last_error": _last_bot_error,
+        "webhook_info": webhook_info,
+        "active_demo_chat_id": active_chat,
+        "linked_customers": [
+            {"id": c.id, "name": c.name, "phone": c.phone, "chat_id": c.telegram_chat_id}
+            for c in linked_customers
+        ]
+    }
