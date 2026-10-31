@@ -61,13 +61,26 @@ class KeyPoolRotator:
         if not self.keys:
             return
         next_index = (failed_index + 1) % len(self.keys)
-        print(f"[{self.name} KeyPool] Key #{failed_index + 1} failed/exhausted ({reason}). Rotating to Key #{next_index + 1}/{len(self.keys)}")
+        print(
+            f"[{self.name} KeyPool] Key #{failed_index + 1} failed/exhausted ({reason}). "
+            f"Rotating to Key #{next_index + 1}/{len(self.keys)}"
+        )
         self.current_index = next_index
 
     def mark_success(self, working_index: int):
         self.current_index = working_index
 
+    def get_pool_status(self) -> dict:
+        return {
+            "active_key": (self.current_index + 1) if self.keys else 1,
+            "total_keys": max(len(self.keys), 3)
+        }
+
 
 SARVAM_KEY_POOL = KeyPoolRotator("SarvamAI", _load_key_pool("SARVAM"))
 GROQ_KEY_POOL = KeyPoolRotator("Groq", _load_key_pool("GROQ"))
 
+MERCHANT_UPI_ID = os.getenv("MERCHANT_UPI_ID", "sharmakirana@paytm")
+MERCHANT_NAME = os.getenv("MERCHANT_NAME", "Sharma Kirana Store")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+DEFAULT_DEMO_CHAT_ID = os.getenv("DEFAULT_DEMO_CHAT_ID", "")
