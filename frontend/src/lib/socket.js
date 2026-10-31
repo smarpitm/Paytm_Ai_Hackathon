@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 
-const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000';
+const getWsBaseUrl = () => {
+  if (import.meta.env.VITE_WS_BASE_URL) return import.meta.env.VITE_WS_BASE_URL;
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
+  }
+  return 'ws://localhost:8000';
+};
+
+const WS_BASE_URL = getWsBaseUrl();
 
 // -------------------------------------------------------------------
 // Speech Synthesis & Base64 Audio Player

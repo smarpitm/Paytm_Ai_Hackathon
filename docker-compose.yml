@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: voicevyapar-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - MERCHANT_NAME=${MERCHANT_NAME:-Sharma Kirana Store}
+      - MERCHANT_UPI_ID=${MERCHANT_UPI_ID:-sharmakirana@paytm}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - SARVAM_API_KEY=${SARVAM_API_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    volumes:
+      - voicevyapar_data:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: voicevyapar-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  voicevyapar_data:

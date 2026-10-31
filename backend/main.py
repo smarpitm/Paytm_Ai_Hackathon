@@ -129,6 +129,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_origin_regex=".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -136,8 +137,21 @@ app.add_middleware(
 
 
 # -------------------------------------------------------------------
-# Health Check
+# Root & Health Check
 # -------------------------------------------------------------------
+@app.get("/")
+def root():
+    return {
+        "status": "online",
+        "app": "Paytm VoiceVyapar API",
+        "version": "1.0.0",
+        "docs_url": "/docs",
+        "health_url": "/health",
+        "ws_url": "/ws/events",
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+    }
+
+
 @app.get("/health")
 def health_check():
     return {
