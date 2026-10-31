@@ -10,7 +10,7 @@ VoiceVyapar is a hyper-localized, voice-first AI CFO and business copilot built 
 
 ### 1. Backend Setup
 ```bash
-cd voicevyapar/backend
+cd backend
 python -m venv venv
 # Windows:
 venv\Scripts\activate
@@ -24,7 +24,7 @@ Swagger UI documentation is available at `http://localhost:8000/docs`.
 
 ### 2. Frontend Setup
 ```bash
-cd voicevyapar/frontend
+cd frontend
 npm install
 npm run dev
 ```
@@ -36,10 +36,12 @@ Open `http://localhost:5173` to access:
 
 ## 📁 Repository Structure
 ```
-voicevyapar/
+.
 ├── README.md
 ├── .env.example
+├── .gitignore
 ├── context.txt
+├── prd_final.md
 ├── backend/
 │   ├── requirements.txt
 │   ├── .env

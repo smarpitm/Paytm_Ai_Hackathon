@@ -5,10 +5,12 @@
 # 3. After completing the prompt, update ONLY your assigned line under `## 6. LIVE BUILD STATUS` in `context.txt`.
 
 ## 1. EXACT PRD REPOSITORY FILE STRUCTURE & OWNERSHIP MAP
-voicevyapar/
+. (Repository Root)
 ├── README.md                        [LOCKED IN SCAFFOLD]
 ├── .env.example                     [LOCKED IN SCAFFOLD]
+├── .gitignore                       [LOCKED IN SCAFFOLD]
 ├── context.txt                      [SHARED STATUS LOG]
+├── prd_final.md                     [LOCKED IN SCAFFOLD]
 ├── backend/
 │   ├── requirements.txt             [LOCKED IN SCAFFOLD]
 │   ├── .env                         [LOCAL ENV]
