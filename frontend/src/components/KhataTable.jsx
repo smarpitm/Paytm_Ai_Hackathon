@@ -132,9 +132,15 @@ export default function KhataTable({ customers = [], transactions = [], refreshD
                             <span>🟢 Phone Linked</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-[11px] font-mono">
-                            Send /link {firstName} to Bot
-                          </span>
+                          <a
+                            href={`https://t.me/Paytm_01bot?start=link_${firstName}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 hover:text-sky-300 border border-sky-500/30 text-[11px] font-mono transition-colors"
+                            title="Click to open @Paytm_01bot and link this customer on your phone Telegram"
+                          >
+                            <span>📱 Link {firstName}</span>
+                          </a>
                         )}
                       </td>
 

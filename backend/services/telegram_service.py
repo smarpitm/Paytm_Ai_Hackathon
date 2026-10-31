@@ -24,30 +24,59 @@ def is_telegram_bot_active() -> bool:
     return bool(token and not token.startswith("your_"))
 
 
+def get_active_demo_chat_id() -> str:
+    global _active_demo_chat_id
+    return _active_demo_chat_id
+
+
+def set_active_demo_chat_id(chat_id: str) -> None:
+    global _active_demo_chat_id
+    _active_demo_chat_id = str(chat_id).strip()
+
+
 async def handle_link_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     global _active_demo_chat_id
     if not update.effective_chat:
         return
     chat_id = str(update.effective_chat.id)
     _active_demo_chat_id = chat_id
-    query = " ".join(context.args).strip() if context.args else "Ramesh"
+    first_name = (update.effective_user.first_name if update.effective_user else "Merchant Friend") or "Merchant Friend"
+    query = " ".join(context.args).strip() if (context and context.args) else "Ramesh"
 
     with SessionLocal() as db:
         customer = (
             db.query(Customer)
             .filter((Customer.phone == query) | (Customer.name.ilike(f"%{query}%")))
             .first()
-        ) or db.query(Customer).first()
+        ) or db.query(Customer).filter(Customer.name.ilike("%Ramesh%")).first() or db.query(Customer).first()
 
         if customer:
             customer.telegram_chat_id = chat_id
             db.commit()
-            reply = f"✅ Your phone is now linked as {customer.name} ({customer.phone}) for Sharma Kirana Store!"
+            reply = (
+                f"🙏 Namaste {first_name} ji!\n\n"
+                f"✅ Aapka Telegram successfully link ho gaya hai **Sharma Kirana Store** se!\n"
+                f"👤 Linked Profile: **{customer.name}** ({customer.phone})\n\n"
+                f"Ab aapko:\n"
+                f"• 💰 Udhaar ke Paytm UPI QR reminders\n"
+                f"• 📢 Dukaan ke Discount Offers & Flash Sale alerts\n"
+                f"• 💳 Instant 1-Click UPI Payment callbacks\n\n"
+                f"seedhe yahan milenge! Live Soundbox ya Web ERP se test karein."
+            )
         else:
-            reply = "✅ Your phone is now linked for Sharma Kirana Store demo alerts!"
+            reply = (
+                f"🙏 Namaste {first_name} ji!\n\n"
+                f"✅ Aapka phone Sharma Kirana Store demo alerts ke liye link ho gaya hai!\n"
+                f"(Chat ID: `{chat_id}`)"
+            )
 
     if update.message:
-        await update.message.reply_text(reply)
+        await update.message.reply_text(reply, parse_mode="Markdown")
+
+
+async def handle_any_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Fallback handler: any plain text (hi, hello, etc.) automatically links the user's phone."""
+    await handle_link_command(update, context)
 
 
 async def handle_voice_note(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -145,8 +174,15 @@ async def send_telegram_qr_reminder(
         f"Scan the Paytm QR above or tap the button below to pay instantly:"
     )
 
+    # Resolution order: customer chat -> active demo chat -> any linked customer chat
     dest_chat = (customer.telegram_chat_id if customer else None) or _active_demo_chat_id
+    if not dest_chat:
+        linked_any = db.query(Customer).filter(Customer.telegram_chat_id.isnot(None)).first()
+        if linked_any:
+            dest_chat = linked_any.telegram_chat_id
+
     delivered = False
+    send_error = None
 
     if _bot_app and is_telegram_bot_active() and dest_chat:
         try:
@@ -156,17 +192,32 @@ async def send_telegram_qr_reminder(
             await _bot_app.bot.send_photo(chat_id=dest_chat, photo=png_bytes, caption=caption, reply_markup=keyboard)
             delivered = True
         except Exception as e:
+            send_error = str(e)
             print(f"[Telegram Send Photo Error] {e}")
 
-    return {"delivered": delivered, "caption": caption, "qr_base64": qr_b64, "amount": amt, "customer_id": customer_id}
+    return {
+        "delivered": delivered,
+        "caption": caption,
+        "qr_base64": qr_b64,
+        "amount": amt,
+        "customer_id": customer_id,
+        "dest_chat": dest_chat,
+        "error": send_error
+    }
 
 
 async def send_telegram_discount_broadcast(
     db: Session,
     item_name: str,
-    discount_offer: str,
-    message_text: str
+    discount_offer: str = "",
+    message_text: str = "",
+    discount_text: str = "",
+    custom_message: str = "",
+    **kwargs
 ) -> int:
+    offer = discount_offer or discount_text or "Special Offer"
+    msg = message_text or custom_message or f"Namaste! Aaj {item_name} par {offer} chhoot hai! Jaldi aayein."
+
     regular_customers = db.query(Customer).filter(Customer.is_regular == True).all()
     count = len(regular_customers) or 5
 
@@ -174,8 +225,14 @@ async def send_telegram_discount_broadcast(
     if _active_demo_chat_id:
         dest_chats.add(_active_demo_chat_id)
 
+    # If no specific regulars linked, check if ANY customer was linked
+    if not dest_chats:
+        linked_any = db.query(Customer).filter(Customer.telegram_chat_id.isnot(None)).first()
+        if linked_any and linked_any.telegram_chat_id:
+            dest_chats.add(linked_any.telegram_chat_id)
+
     if _bot_app and is_telegram_bot_active() and dest_chats:
-        text = f"📢 Sharma Kirana Store Offer!\n\n🛒 {item_name}: {discount_offer}\n\n{message_text}"
+        text = f"📢 Sharma Kirana Store Offer!\n\n🛒 {item_name}: {offer}\n\n{msg}"
         for chat_id in dest_chats:
             try:
                 await _bot_app.bot.send_message(chat_id=chat_id, text=text)
@@ -194,12 +251,19 @@ async def start_telegram_bot(ws_broadcast_callback: Optional[Callable[[dict], An
     try:
         token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
         _bot_app = Application.builder().token(token).build()
-        _bot_app.add_handler(CommandHandler(["start", "link"], handle_link_command))
+        # Handle /start, /link, /help, /connect commands
+        _bot_app.add_handler(CommandHandler(["start", "link", "help", "connect"], handle_link_command))
+        # Handle any freeform incoming text messages (auto-links user phone)
+        _bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_any_text_message))
+        # Handle vernacular voice notes
         _bot_app.add_handler(MessageHandler(filters.VOICE, handle_voice_note))
+        # Handle 1-click inline UPI payment settlement button
         _bot_app.add_handler(CallbackQueryHandler(handle_settle_callback, pattern="^settle_tx:"))
+        
         await _bot_app.initialize()
         await _bot_app.start()
         await _bot_app.updater.start_polling()
+        print("[Telegram Bot] Successfully started and polling for messages as @Paytm_01bot")
     except Exception as e:
         print(f"[Telegram Bot Start Error] {e}")
 

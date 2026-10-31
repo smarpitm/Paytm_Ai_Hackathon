@@ -88,13 +88,16 @@ export default function Navbar({ wsConnected, apiPoolStatus, refreshDashboard })
 
 
           {/* Telegram Bot Live Status */}
-          <div
-            className="hidden lg:flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-300 font-medium"
-            title="Async Telegram bot listening for /link and UPI settlement callbacks"
+          <a
+            href="https://t.me/Paytm_01bot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/40 text-sky-300 font-medium transition-all hover:scale-105 shadow-sm"
+            title="Click to open @Paytm_01bot on Telegram and link your phone for live QR payment alerts"
           >
-            <Bot className="w-3.5 h-3.5 text-[#00BAF2]" />
-            <span>📱 Telegram Bot Active</span>
-          </div>
+            <Bot className="w-3.5 h-3.5 text-[#00BAF2] animate-bounce" />
+            <span>📱 Connect Phone (@Paytm_01bot)</span>
+          </a>
 
           {/* Reset Demo Data Button */}
           <button

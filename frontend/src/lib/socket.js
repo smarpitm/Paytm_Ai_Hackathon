@@ -5,6 +5,11 @@ const getWsBaseUrl = () => {
   if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
   }
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname.includes('onrender.com') || window.location.hostname.includes('render.com')) {
+      return 'wss://voicevyapar-backend.onrender.com';
+    }
+  }
   return 'ws://localhost:8000';
 };
 

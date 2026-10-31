@@ -1,4 +1,14 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const getApiBaseUrl = () => {
+  if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL;
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname.includes('onrender.com') || window.location.hostname.includes('render.com')) {
+      return 'https://voicevyapar-backend.onrender.com';
+    }
+  }
+  return 'http://localhost:8000';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // -------------------------------------------------------------------
 // Helper: Dispatch Mock WebSocket Event to Window
@@ -532,4 +542,37 @@ export async function resetDemoData() {
 
   dispatchMockWsEvent(mockPayload);
   return { status: "reset_complete" };
+}
+
+// -------------------------------------------------------------------
+// 9. Telegram Helper API Functions
+// -------------------------------------------------------------------
+export async function fetchTelegramStatus() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/telegram/status`);
+    if (res.ok) return await res.json();
+  } catch (err) {
+    console.warn('[API] fetchTelegramStatus backend offline');
+  }
+  return {
+    bot_active: true,
+    bot_username: "Paytm_01bot",
+    bot_link: "https://t.me/Paytm_01bot",
+    active_demo_chat_id: "",
+    linked_customers: []
+  };
+}
+
+export async function linkTelegramChat(chatId, customerId = 1) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/telegram/link-chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, customer_id: customerId }),
+    });
+    if (res.ok) return await res.json();
+  } catch (err) {
+    console.warn('[API] linkTelegramChat backend offline');
+  }
+  return { status: "linked", chat_id: chatId, customer_id: customerId };
 }

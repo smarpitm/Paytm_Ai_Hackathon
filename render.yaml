@@ -29,6 +29,11 @@ services:
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://voicevyapar-backend.onrender.com
+      - key: VITE_WS_BASE_URL
+        value: wss://voicevyapar-backend.onrender.com
     routes:
       - type: rewrite
         source: /*

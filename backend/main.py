@@ -28,7 +28,9 @@ from services.telegram_service import (
     start_telegram_bot,
     stop_telegram_bot,
     send_telegram_qr_reminder,
-    send_telegram_discount_broadcast
+    send_telegram_discount_broadcast,
+    get_active_demo_chat_id,
+    set_active_demo_chat_id
 )
 from config import SARVAM_KEY_POOL, GROQ_KEY_POOL
 
@@ -586,3 +588,62 @@ async def demo_reset(db: Session = Depends(get_db)):
     }
     await ws_manager.broadcast(event)
     return {"status": "reset_complete", "details": seed_res}
+
+
+# -------------------------------------------------------------------
+# 9. Telegram Bot Diagnostics & Link Helper
+# -------------------------------------------------------------------
+@app.get("/api/v1/telegram/status")
+def telegram_bot_status(db: Session = Depends(get_db)):
+    linked_customers = db.query(Customer).filter(Customer.telegram_chat_id.isnot(None)).all()
+    active_chat = get_active_demo_chat_id()
+    return {
+        "bot_active": is_telegram_bot_active(),
+        "bot_username": "Paytm_01bot",
+        "bot_link": "https://t.me/Paytm_01bot",
+        "active_demo_chat_id": active_chat,
+        "linked_customers": [
+            {"id": c.id, "name": c.name, "phone": c.phone, "chat_id": c.telegram_chat_id}
+            for c in linked_customers
+        ]
+    }
+
+
+@app.post("/api/v1/telegram/link-chat")
+def link_telegram_chat(payload: dict, db: Session = Depends(get_db)):
+    chat_id = str(payload.get("chat_id", "")).strip()
+    if not chat_id:
+        raise HTTPException(status_code=400, detail="chat_id is required")
+    set_active_demo_chat_id(chat_id)
+
+    customer_id = payload.get("customer_id")
+    cust = None
+    if customer_id:
+        cust = db.query(Customer).filter(Customer.id == int(customer_id)).first()
+    if not cust:
+        cust = db.query(Customer).filter(Customer.name.ilike("%Ramesh%")).first() or db.query(Customer).first()
+
+    if cust:
+        cust.telegram_chat_id = chat_id
+        db.commit()
+        db.refresh(cust)
+
+    return {
+        "status": "linked",
+        "chat_id": chat_id,
+        "customer_id": cust.id if cust else None,
+        "customer_name": cust.name if cust else None
+    }
+
+
+@app.post("/api/v1/telegram/send-test")
+async def send_test_telegram(payload: dict = {}, db: Session = Depends(get_db)):
+    cust = db.query(Customer).first()
+    res = await send_telegram_qr_reminder(
+        db,
+        customer_id=cust.id if cust else 1,
+        amount=150.0,
+        item_name="Paytm Kirana Test Udhaar",
+        tx_id=1
+    )
+    return res
