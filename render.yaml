@@ -22,13 +22,11 @@ services:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
 
-  # 2. Vite React Frontend (Static Site)
+  # 2. Vite React Frontend (Static Site on Global CDN)
   - type: web
     name: voicevyapar-frontend
     runtime: static
     rootDir: frontend
-    plan: free
-    region: singapore
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     routes:
