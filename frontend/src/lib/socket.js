@@ -55,6 +55,13 @@ function fallbackSpeech(text, onStart = null, onEnd = null) {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'hi-IN';
       utterance.rate = 1.02;
+      const femaleVoices = window.speechSynthesis.getVoices().filter((voice) =>
+        /(female|woman|priya|meera|anushka|manisha|vidya|pooja|ritu|simran|kavya|ishita|shreya|aditi|kalpana|lekha)/i.test(voice.name)
+      );
+      const femaleVoice = femaleVoices.find((voice) =>
+        voice.lang.toLowerCase().startsWith('hi')
+      ) || femaleVoices[0];
+      if (femaleVoice) utterance.voice = femaleVoice;
 
       if (onStart) utterance.onstart = () => onStart();
       if (onEnd) {
@@ -92,11 +99,6 @@ export function useVoiceVyaparSocket(onEvent) {
     const handlePayload = (payload) => {
       if (!isMounted || !payload) return;
       setLastEvent(payload);
-
-      // Automatically play TTS or spoken vernacular fallback
-      if (payload.reply_text) {
-        playTtsAudio(payload.tts_audio_base64, payload.reply_text);
-      }
 
       if (onEventRef.current) {
         onEventRef.current(payload);

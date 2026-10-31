@@ -107,7 +107,8 @@ SARVAM_API_KEY_2=sarvam_key_teammate_2
 SARVAM_API_KEY_3=sarvam_key_teammate_3
 SARVAM_STT_MODEL=saaras:v3
 SARVAM_TTS_MODEL=bulbul:v3
-SARVAM_TTS_SPEAKER=meera
+SARVAM_TTS_FEMALE_SPEAKER=priya
+SARVAM_TTS_MALE_FALLBACK_SPEAKER=arvind
 
 # Groq API Multi-Key Pool (Comma-separated OR numbered keys; rotates across keys AND falls back from 70b to 8b)
 GROQ_API_KEYS=gsk_key_teammate_1,gsk_key_teammate_2,gsk_key_teammate_3
@@ -126,6 +127,8 @@ MERCHANT_UPI_ID=sharmakirana@paytm
 MERCHANT_NAME=Sharma Kirana Store
 
 ```
+
+TTS tries `SARVAM_TTS_FEMALE_SPEAKER` across the available Sarvam keys first. It uses `SARVAM_TTS_MALE_FALLBACK_SPEAKER` only if the female voice fails for every key.
 
 ### 3.2 `backend/config.py` (Central Multi-Key Pool & Stateful Rotator)
 
@@ -440,16 +443,17 @@ async def transcribe_audio_sarvam(audio_bytes: bytes, filename: str = "voice.wav
 
 async def synthesize_speech_sarvam(text: str, target_language: str = "hi-IN") -> str:
     """
-    Calls Sarvam AI Bulbul TTS across the multi-key pool and returns a base64-encoded WAV string.
+    Tries the female voice across the multi-key pool before the male fallback voice.
     """
     ordered_keys = SARVAM_KEY_POOL.get_ordered_keys()
     if not ordered_keys:
         return ""
 
+    female_speaker = os.getenv("SARVAM_TTS_FEMALE_SPEAKER", "priya")
     payload = {
         "inputs": [text[:490]],
         "target_language_code": target_language,
-        "speaker": os.getenv("SARVAM_TTS_SPEAKER", "meera"),
+        "speaker": female_speaker,
         "pitch": 0,
         "pace": 1.05,
         "loudness": 1.5,

@@ -87,54 +87,88 @@ async def transcribe_audio_sarvam(audio_bytes: bytes, filename: str = "voice.wav
 
 async def synthesize_speech_sarvam(text: str, target_language: str = "hi-IN") -> str:
     """
-    Calls Sarvam AI Bulbul TTS across the multi-key pool and returns a base64-encoded WAV string.
-    Returns empty string if no valid keys or all calls fail.
+    Tries the preferred female Bulbul voice across the multi-key pool before
+    falling back to the configured male voice.
     """
     ordered_keys = SARVAM_KEY_POOL.get_ordered_keys()
     if not ordered_keys:
+        print("[Sarvam TTS Warning] No API keys are configured.")
         return ""
 
-    speaker = os.getenv("SARVAM_TTS_SPEAKER", "meera")
-    if speaker.lower() == "meera":
-        speaker = "priya"
-
-    payload = {
-        "inputs": [text[:490]],
-        "target_language_code": target_language,
-        "speaker": speaker,
-        "pitch": 0,
-        "pace": 1.05,
-        "loudness": 1.5,
-        "speech_sample_rate": 16000,
-        "enable_preprocessing": True,
-        "model": os.getenv("SARVAM_TTS_MODEL", "bulbul:v3")
-    }
+    female_speaker = os.getenv("SARVAM_TTS_FEMALE_SPEAKER", "priya").strip() or "priya"
+    if female_speaker.lower() == "meera":
+        female_speaker = "priya"
+    male_fallback_speaker = (
+        os.getenv("SARVAM_TTS_MALE_FALLBACK_SPEAKER", "arvind").strip() or "arvind"
+    )
+    speakers = list(dict.fromkeys((female_speaker, male_fallback_speaker)))
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            for key_idx, api_key in ordered_keys:
-                headers = {
-                    "api-subscription-key": api_key,
-                    "Content-Type": "application/json"
-                }
-                try:
-                    resp = await client.post(
-                        "https://api.sarvam.ai/text-to-speech",
-                        headers=headers,
-                        json=payload
-                    )
-                    if resp.status_code in (401, 402, 403, 429) or resp.status_code >= 500:
-                        SARVAM_KEY_POOL.mark_exhausted_or_failed(key_idx, f"TTS HTTP {resp.status_code}")
+            for speaker_index, speaker in enumerate(speakers):
+                for key_idx, api_key in ordered_keys:
+                    headers = {
+                        "api-subscription-key": api_key,
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "inputs": [text[:490]],
+                        "target_language_code": target_language,
+                        "speaker": speaker,
+                        "pitch": 0,
+                        "pace": 1.05,
+                        "loudness": 1.5,
+                        "speech_sample_rate": 16000,
+                        "enable_preprocessing": True,
+                        "model": os.getenv("SARVAM_TTS_MODEL", "bulbul:v3")
+                    }
+                    try:
+                        resp = await client.post(
+                            "https://api.sarvam.ai/text-to-speech",
+                            headers=headers,
+                            json=payload
+                        )
+                    except httpx.RequestError as exc:
+                        SARVAM_KEY_POOL.mark_exhausted_or_failed(key_idx, str(exc))
                         continue
 
-                    if resp.status_code == 200:
-                        SARVAM_KEY_POOL.mark_success(key_idx)
-                        audios = resp.json().get("audios", [])
-                        return audios[0] if audios else ""
-                except Exception as exc:
-                    SARVAM_KEY_POOL.mark_exhausted_or_failed(key_idx, str(exc))
-                    continue
-    except Exception:
-        pass
+                    if resp.status_code in (401, 402, 403, 429) or resp.status_code >= 500:
+                        SARVAM_KEY_POOL.mark_exhausted_or_failed(
+                            key_idx, f"TTS HTTP {resp.status_code}"
+                        )
+                        continue
 
+                    if resp.status_code != 200:
+                        print(
+                            f"[Sarvam TTS Warning] Speaker '{speaker}' failed "
+                            f"with HTTP {resp.status_code}."
+                        )
+                        continue
+
+                    try:
+                        response_payload = resp.json()
+                    except ValueError as exc:
+                        print(f"[Sarvam TTS Warning] Invalid response for '{speaker}': {exc}")
+                        continue
+
+                    audios = (
+                        response_payload.get("audios", [])
+                        if isinstance(response_payload, dict)
+                        else []
+                    )
+                    if audios and audios[0]:
+                        SARVAM_KEY_POOL.mark_success(key_idx)
+                        return audios[0]
+
+                    print(f"[Sarvam TTS Warning] No audio returned for speaker '{speaker}'.")
+
+                if speaker_index == 0:
+                    print(
+                        f"[Sarvam TTS Warning] Female speaker '{speaker}' failed across "
+                        "the available API keys; trying the male fallback."
+                    )
+    except httpx.HTTPError as exc:
+        print(f"[Sarvam TTS Warning] TTS request could not be completed: {exc}")
+
+    print("[Sarvam TTS Warning] Female and male TTS attempts failed.")
     return ""
