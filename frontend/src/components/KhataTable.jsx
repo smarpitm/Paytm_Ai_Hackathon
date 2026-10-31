@@ -220,13 +220,26 @@ export default function KhataTable({ customers = [], transactions = [], refreshD
               </button>
             </div>
 
-            {/* Delivery Status Indicator */}
-            <div className="flex items-center justify-between text-xs px-3 py-2 bg-slate-950 rounded-xl border border-slate-800">
-              <span className="text-slate-400">Telegram Destination:</span>
-              <span className="inline-flex items-center gap-1 font-semibold text-emerald-400">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{qrModalData.delivered ? 'Dispatched to Phone' : 'Demo Channel Ready'}</span>
-              </span>
+            {/* Delivery Status Indicator & Quick Connect */}
+            <div className="flex flex-col gap-2 p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Telegram Destination:</span>
+                <span className={`inline-flex items-center gap-1 font-semibold ${qrModalData.delivered ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{qrModalData.delivered ? '🟢 Dispatched to Phone' : '🟡 Demo Channel Ready (Tap to Link)'}</span>
+                </span>
+              </div>
+              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                <span className="text-[11px] text-slate-400">Link your phone for live alerts:</span>
+                <a
+                  href={`https://t.me/Paytm_01bot?start=link_${encodeURIComponent(qrModalData.customer.name.split(' ')[0])}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 bg-[#00BAF2] hover:bg-[#00a3d4] text-[#002970] font-bold text-[11px] px-2.5 py-1 rounded-lg transition-all shadow-sm"
+                >
+                  <span>📱 Open @Paytm_01bot on Telegram</span>
+                </a>
+              </div>
             </div>
 
             {/* Generated Paytm Navy Blue UPI QR Image */}
