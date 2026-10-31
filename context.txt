@@ -107,6 +107,6 @@
 - SMARPIT_S1 (backend/services/qr_service.py, backend/services/credit_engine.py): DONE
 - SMARPIT_S2 (backend/services/telegram_service.py): DONE
 - SMARPIT_S3 (frontend/src/lib/api.js, socket.js, components/Navbar.jsx): DONE
-- SMARPIT_S4 (frontend/src/components/KhataTable.jsx, pages/ErpDashboardPage.jsx): PENDING
+- SMARPIT_S4 (frontend/src/components/KhataTable.jsx, pages/ErpDashboardPage.jsx): DONE
 - SMARPIT_S5 (frontend/src/components/BroadcastPanel.jsx, components/CreditScoreCard.jsx): PENDING
 
