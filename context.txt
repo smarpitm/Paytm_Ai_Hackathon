@@ -100,7 +100,7 @@
 ## 6. LIVE BUILD STATUS (Updated automatically after every prompt)
 - SCAFFOLD: DONE (Exact PRD tree, DB models, contract stubs, and context.txt initialized)
 - KUSH_K1 (backend/config.py, backend/seed.py): DONE
-- KUSH_K2 (backend/services/sarvam_service.py, backend/services/llm_service.py): PENDING
+- KUSH_K2 (backend/services/sarvam_service.py, backend/services/llm_service.py): DONE
 - KUSH_K3 (backend/services/session_manager.py): PENDING
 - KUSH_K4 (backend/main.py): PENDING
 - KUSH_K5 (frontend/src/components/SoundboxDevice.jsx, TelemetryLog.jsx, pages/SoundboxPage.jsx): PENDING
