@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Radio, RefreshCw, Volume2, LayoutDashboard, Cpu, Bot } from 'lucide-react';
+import { Radio, RefreshCw, Volume2, LayoutDashboard, Bot } from 'lucide-react';
 import { resetDemoData } from '../lib/api';
 
 export default function Navbar({ wsConnected, apiPoolStatus, refreshDashboard }) {
@@ -20,10 +20,6 @@ export default function Navbar({ wsConnected, apiPoolStatus, refreshDashboard })
     }
   };
 
-  const sarvamActive = apiPoolStatus?.sarvam_active_index || 1;
-  const sarvamTotal = apiPoolStatus?.sarvam_total_keys || 3;
-  const groqActive = apiPoolStatus?.groq_active_index || 1;
-  const groqTotal = apiPoolStatus?.groq_total_keys || 3;
 
   return (
     <header className="bg-[#002970] text-white border-b border-[#001844] shadow-md sticky top-0 z-50">
@@ -90,14 +86,6 @@ export default function Navbar({ wsConnected, apiPoolStatus, refreshDashboard })
             <span>{wsConnected ? '🟢 Edge Connected' : '🟡 Simulator Ready'}</span>
           </div>
 
-          {/* Multi-Key Pool Status Indicator */}
-          <div
-            className="hidden xl:flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-slate-900/90 border border-slate-700 text-slate-300 font-mono"
-            title="Multi-Key Rotation Pool health for Sarvam STT/TTS and Groq LLM"
-          >
-            <Cpu className="w-3.5 h-3.5 text-[#00BAF2]" />
-            <span>🔑 Sarvam Key #{sarvamActive}/{sarvamTotal} • Groq Key #{groqActive}/{groqTotal}</span>
-          </div>
 
           {/* Telegram Bot Live Status */}
           <div
